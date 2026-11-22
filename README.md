@@ -5,7 +5,7 @@ retrieval-augmented generation (RAG) over real threat-intelligence data
 (CISA Known Exploited Vulnerabilities and MITRE ATT&CK) and will use tools
 to check suspicious URLs and look up CVEs.
 
-> Work in progress. Planned: FastAPI REST API, MLflow evaluation tracking, Docker.
+> Work in progress. Planned: MLflow evaluation tracking, Docker.
 
 ## Setup
 
@@ -57,6 +57,28 @@ The agent is a LangGraph loop. The LLM chooses between three tools:
 | `search_threat_intel` | Hybrid RAG search over CISA KEV, MITRE ATT&CK and local advisories |
 | `lookup_cve` | Exact lookup of a CVE ID in the CISA KEV catalog |
 | `check_url` | Rule-based phishing checks (typosquatting, lookalike characters, brand-in-subdomain, IP hosts, `@` tricks). The URL is never visited. |
+
+## REST API (FastAPI)
+
+```bash
+uvicorn app.api:app --reload
+```
+
+Open http://127.0.0.1:8000/docs for interactive API docs.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/health` | Service health check |
+| POST | `/ask` | Ask the agent a question (`{"question": "..."}`) |
+| POST | `/search` | Search the knowledge base directly (no LLM) |
+| POST | `/check-url` | Phishing checks for a URL (no LLM) |
+| GET | `/cve/{cve_id}` | Look up a CVE in CISA KEV and local advisories |
+
+Example:
+
+```bash
+curl -X POST http://127.0.0.1:8000/ask -H "Content-Type: application/json" -d "{\"question\": \"Is http://paypa1.com/login/verify safe?\"}"
+```
 
 ## Measure search quality
 
