@@ -1,6 +1,15 @@
 """Central settings for the project, read from environment variables (.env)."""
 import os
+import sys
+
 from dotenv import load_dotenv
+
+# Windows terminals often use an old encoding (cp1252) that cannot print characters
+# such as the brackets some LLMs use, which crashes print(). Switch to UTF-8 and
+# replace anything that still cannot be shown instead of crashing.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 load_dotenv()
 
