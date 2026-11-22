@@ -1,0 +1,14 @@
+[
+  {"question": "Is http://paypa1.com/login/verify safe?", "expected_tools": ["check_url"], "must_include": ["paypa1.com", ["high risk", "high-risk"]]},
+  {"question": "Is https://www.asu.edu safe to open?", "expected_tools": ["check_url"], "must_include": [["low risk", "low-risk", "no common phishing"]]},
+  {"question": "Is http://micros0ft-support.xyz/update a phishing link?", "expected_tools": ["check_url"], "must_include": ["micros0ft", ["high risk", "high-risk"]]},
+  {"question": "Check this link: http://bank.com@192.0.2.10/login", "expected_tools": ["check_url"], "must_include": ["@", ["ip address", "192.0.2.10"]]},
+  {"question": "What is CVE-2021-44228 and how do I fix it?", "expected_tools": ["lookup_cve"], "must_include": ["2.17.1", "jndi"]},
+  {"question": "Explain CVE-2014-0160.", "expected_tools": ["lookup_cve"], "must_include": ["openssl", "heartbeat"]},
+  {"question": "Tell me about CVE-2017-0144 and how to protect against it.", "expected_tools": ["lookup_cve"], "must_include": ["smb", "ms17-010"]},
+  {"question": "How do attackers use phishing for initial access?", "expected_tools": ["search_threat_intel"], "must_include": ["T1566"]},
+  {"question": "Which MITRE ATT&CK technique describes repeatedly guessing passwords?", "expected_tools": ["search_threat_intel"], "must_include": ["T1110"]},
+  {"question": "How should we respond to the Citrix Bleed vulnerability?", "expected_tools": ["search_threat_intel", "lookup_cve"], "must_include": ["session", ["CVE-2023-4966", "netscaler"]]},
+  {"question": "What was the xz backdoor and which versions were affected?", "expected_tools": ["search_threat_intel", "lookup_cve"], "must_include": ["5.6.0", "5.6.1"]},
+  {"question": "How do attackers steal credentials from operating system memory, and how can we detect it?", "expected_tools": ["search_threat_intel"], "must_include": ["T1003"]}
+]

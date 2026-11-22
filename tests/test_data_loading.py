@@ -71,3 +71,15 @@ def test_is_correct_matches_id_or_title():
     hit = {"doc_id": "T1566", "text": "T1566 - Phishing (MITRE ATT&CK)\n\nTactics: initial-access"}
     assert is_correct(hit, ["Phishing"])
     assert not is_correct(hit, ["Brute Force"])
+
+
+def test_agent_metrics():
+    from app.agent_metrics import fact_recall, has_citation, parse_judge_output, sourced_part, tool_correct
+
+    assert tool_correct(["lookup_cve"], ["search_threat_intel", "lookup_cve"])
+    assert fact_recall("Upgrade to 2.17.1 to fix JNDI", ["2.17.1", "jndi"]) == 1.0
+    assert fact_recall("It is high‑risk", [["high risk", "high-risk"]]) == 1.0
+    assert has_citation("Log4Shell [CVE-2021-44228] is critical")
+    assert has_citation("Phishing [T1566.002]")
+    assert "SBOM" not in sourced_part("Fact.\n**General guidance (not from the knowledge base)**\nUse an SBOM")
+    assert parse_judge_output('Here: {"faithfulness": 0.8, "unsupported_claims": ["x"]}')["faithfulness"] == 0.8

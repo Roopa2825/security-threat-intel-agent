@@ -5,7 +5,7 @@ retrieval-augmented generation (RAG) over real threat-intelligence data
 (CISA Known Exploited Vulnerabilities and MITRE ATT&CK) and will use tools
 to check suspicious URLs and look up CVEs.
 
-> Work in progress. Planned: MLflow evaluation tracking, Docker.
+> Work in progress. Planned: Docker.
 
 ## Setup
 
@@ -88,6 +88,26 @@ python -m app.evaluate_retrieval
 
 Reports Hit@5 and MRR for vector-only, hybrid and hybrid + rerank search on a labeled
 question set (`eval/retrieval_questions.json`).
+
+## Evaluate the agent (MLflow)
+
+```bash
+python -m app.evaluate_agent
+mlflow ui --backend-store-uri sqlite:///mlflow.db     # open http://127.0.0.1:5000
+```
+
+Runs the labeled questions in `eval/agent_questions.json` through the agent and logs to MLflow:
+
+| Metric | Meaning |
+|---|---|
+| `tool_accuracy` | Share of questions where the agent chose the expected tool |
+| `fact_recall` | Share of required facts present in the answer |
+| `citation_rate` | Share of answers that cite a CVE or ATT&CK ID |
+| `faithfulness` | LLM-as-judge score: are the answer's specific claims supported by tool outputs? |
+| `latency_ms_median` | Median time per question |
+| `retrieval_*_hit_at_5`, `retrieval_*_mrr` | Retrieval quality for each search mode |
+
+Each run records the model and settings, so different models or prompts can be compared side by side.
 
 ## Run the tests
 

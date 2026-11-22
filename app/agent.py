@@ -53,8 +53,12 @@ def ask(agent, question: str) -> dict:
         {"messages": [HumanMessage(content=question)]},
         config={"recursion_limit": MAX_STEPS},
     )
-    tools_used = [m.name for m in result["messages"] if isinstance(m, ToolMessage)]
-    return {"answer": result["messages"][-1].content, "tools_used": tools_used}
+    tool_messages = [m for m in result["messages"] if isinstance(m, ToolMessage)]
+    return {
+        "answer": result["messages"][-1].content,
+        "tools_used": [m.name for m in tool_messages],
+        "tool_outputs": [str(m.content) for m in tool_messages],
+    }
 
 
 def main() -> None:
