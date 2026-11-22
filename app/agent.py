@@ -7,6 +7,7 @@ Run:  python -m app.agent "Is http://paypa1.com/login safe?"
       python -m app.agent            (interactive chat)
 """
 import sys
+import time
 
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, START, MessagesState, StateGraph
@@ -35,6 +36,8 @@ Answer format:
 If the tools do not contain the answer, say so instead of guessing."""
 
 MAX_STEPS = 12  # safety limit on agent <-> tool round trips
+RETRIES = 2  # extra attempts if the LLM provider returns an error
+RETRY_WAIT_SECONDS = 5
 
 
 def build_agent():
@@ -55,10 +58,17 @@ def build_agent():
 
 def ask(agent, question: str) -> dict:
     """Run one question; return the answer and the tools that were used."""
-    result = agent.invoke(
-        {"messages": [HumanMessage(content=question)]},
-        config={"recursion_limit": MAX_STEPS},
-    )
+    for attempt in range(1, RETRIES + 2):
+        try:
+            result = agent.invoke(
+                {"messages": [HumanMessage(content=question)]},
+                config={"recursion_limit": MAX_STEPS},
+            )
+            break
+        except Exception:  # e.g. rate limit or a malformed tool call from the LLM
+            if attempt > RETRIES:
+                raise
+            time.sleep(RETRY_WAIT_SECONDS * attempt)
     tool_messages = [m for m in result["messages"] if isinstance(m, ToolMessage)]
     return {
         "answer": result["messages"][-1].content,

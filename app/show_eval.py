@@ -40,10 +40,15 @@ def main() -> None:
         if "error" in r:
             print(f"{i:>2}. ERROR {r['question']}\n    {r['error']}\n")
             continue
-        print(f"{i:>2}. faithfulness {r['faithfulness']} | tools: {r['tools_used']} | {r['question']}")
+        cited = "yes" if r.get("has_citation") else ("no" if r.get("expects_citation", True) else "n/a")
+        print(f"{i:>2}. faithfulness {r['faithfulness']} | facts {r['fact_recall']} | cited {cited} "
+              f"| tools: {r['tools_used']} | {r['question']}")
         if r.get("unsupported_claims"):
             for claim in r["unsupported_claims"].split("; "):
                 print(f"      - unsupported: {claim}")
+        needs_look = r["fact_recall"] < 1 or cited == "no" or (r["faithfulness"] or 0) < 0.8
+        if needs_look:
+            print("      answer: " + r["answer"][:600].replace("\n", " ") + " ...")
     print()
 
     if len(runs) == 2:

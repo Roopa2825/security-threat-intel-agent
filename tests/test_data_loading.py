@@ -97,3 +97,12 @@ def test_citation_rate_only_counts_questions_that_expect_citations():
     summary = summarize(rows)
     assert summary["citation_rate"] == 1.0
     assert summary["faithfulness"] == 0.75
+
+
+def test_citation_detection_handles_llm_formatting():
+    from app.agent_metrics import has_citation
+
+    assert has_citation("Phishing 【T1566】 is common")          # 【T1566】
+    assert has_citation("[​CVE‑2021‑44228]")              # zero-width space, non-breaking hyphens
+    assert has_citation("[T1566 - Phishing]")
+    assert not has_citation("No sources here")

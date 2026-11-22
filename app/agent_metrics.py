@@ -2,7 +2,8 @@
 import json
 import re
 
-CITATION_PATTERN = re.compile(r"\[(CVE-\d{4}-\d{4,}|T\d{4}(?:\.\d{3})?)\]", re.IGNORECASE)
+# A source ID inside square brackets, possibly followed by more text, e.g. [T1566] or [T1566 - Phishing].
+CITATION_PATTERN = re.compile(r"\[\s*(CVE-\d{4}-\d{4,}|T\d{4}(?:\.\d{3})?)\b", re.IGNORECASE)
 GENERAL_GUIDANCE_HEADING = "general guidance (not from the knowledge base)"
 
 
@@ -34,7 +35,7 @@ def fact_recall(answer: str, must_include: list) -> float:
 
 
 def has_citation(answer: str) -> bool:
-    return bool(CITATION_PATTERN.search(normalize(answer).upper()))
+    return bool(CITATION_PATTERN.search(normalize(answer)))
 
 
 def sourced_part(answer: str) -> str:
