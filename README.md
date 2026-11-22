@@ -109,6 +109,10 @@ Runs the labeled questions in `eval/agent_questions.json` through the agent and 
 
 Each run records the model and settings, so different models or prompts can be compared side by side.
 
+```bash
+python -m app.show_eval    # per-question scores, unsupported claims, and latest vs previous run
+```
+
 ## Run the tests
 
 ```bash

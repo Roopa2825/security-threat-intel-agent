@@ -83,3 +83,17 @@ def test_agent_metrics():
     assert has_citation("Phishing [T1566.002]")
     assert "SBOM" not in sourced_part("Fact.\n**General guidance (not from the knowledge base)**\nUse an SBOM")
     assert parse_judge_output('Here: {"faithfulness": 0.8, "unsupported_claims": ["x"]}')["faithfulness"] == 0.8
+
+
+def test_citation_rate_only_counts_questions_that_expect_citations():
+    from app.evaluate_agent import summarize
+
+    rows = [
+        {"tool_correct": True, "fact_recall": 1.0, "has_citation": False, "expects_citation": False,
+         "faithfulness": 1.0, "latency_ms": 100},
+        {"tool_correct": True, "fact_recall": 1.0, "has_citation": True, "expects_citation": True,
+         "faithfulness": 0.5, "latency_ms": 300},
+    ]
+    summary = summarize(rows)
+    assert summary["citation_rate"] == 1.0
+    assert summary["faithfulness"] == 0.75

@@ -34,9 +34,13 @@ ANSWER TO GRADE:
 {answer}
 
 List every specific factual claim in the answer (versions, dates, settings, CVE or
-technique details, risk verdicts) that is NOT supported by the context. Ignore
-general advice and formatting. Then give a faithfulness score from 0.0 (mostly
-unsupported) to 1.0 (every specific claim is supported).
+technique details, risk verdicts) that is NOT supported by the context.
+- Paraphrases and summaries of the context count as supported.
+- A risk verdict or reason returned by the URL-checking tool counts as supported.
+- Source IDs in square brackets are references, not claims.
+- Ignore general advice and formatting.
+Then give a faithfulness score from 0.0 (mostly unsupported) to 1.0 (every
+specific claim is supported).
 
 Reply with JSON only: {{"faithfulness": <number>, "unsupported_claims": [<strings>]}}"""
 
@@ -69,6 +73,7 @@ def run_question(agent, llm, item: dict) -> dict:
         "tools_used": ", ".join(out["tools_used"]),
         "tool_correct": tool_correct(out["tools_used"], item["expected_tools"]),
         "fact_recall": round(fact_recall(out["answer"], item.get("must_include", [])), 3),
+        "expects_citation": item.get("expects_citation", True),
         "has_citation": has_citation(out["answer"]),
         "faithfulness": verdict["faithfulness"],
         "unsupported_claims": "; ".join(verdict["unsupported_claims"]),
@@ -86,7 +91,7 @@ def summarize(rows: list[dict]) -> dict:
         "errors": len(rows) - len(ok),
         "tool_accuracy": mean([float(r["tool_correct"]) for r in ok]),
         "fact_recall": mean([r["fact_recall"] for r in ok]),
-        "citation_rate": mean([float(r["has_citation"]) for r in ok]),
+        "citation_rate": mean([float(r["has_citation"]) for r in ok if r.get("expects_citation", True)]),
         "faithfulness": mean(faith),
         "latency_ms_median": int(statistics.median([r["latency_ms"] for r in ok])) if ok else 0,
     }
