@@ -54,35 +54,99 @@ def kev_to_documents(kev: dict) -> list[dict]:
     return docs
 
 
-def attack_to_documents(bundle: dict) -> list[dict]:
-    """Turn each active MITRE ATT&CK technique into one text document."""
-    docs = []
-    for obj in bundle.get("objects", []):
-        if obj.get("type") != "attack-pattern":
+MAX_ITEMS = 8        # detection / mitigation entries kept per technique
+MAX_ITEM_CHARS = 400  # characters kept per entry
+
+
+def is_active(obj: dict) -> bool:
+    return not (obj.get("revoked") or obj.get("x_mitre_deprecated"))
+
+
+def short(text: str, limit: int = MAX_ITEM_CHARS) -> str:
+    text = " ".join((text or "").split())
+    return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + "..."
+
+
+def attack_id(obj: dict) -> str | None:
+    return next((ref["external_id"] for ref in obj.get("external_references", [])
+                 if ref.get("source_name") == "mitre-attack"), None)
+
+
+def detection_lines(technique: dict, relationships: list[dict], objects: dict) -> list[str]:
+    """How to detect a technique. ATT&CK has stored this in different ways over time:
+    a text field on the technique (older versions), data components that 'detect' it,
+    and detection strategies with analytics (newer versions). Use whatever exists."""
+    lines = []
+    if technique.get("x_mitre_detection"):
+        lines.append(short(technique["x_mitre_detection"], 1200))
+    for rel in relationships:
+        if rel.get("relationship_type") != "detects":
             continue
-        if obj.get("revoked") or obj.get("x_mitre_deprecated"):
-            continue  # skip techniques MITRE no longer uses
-        technique_id = next(
-            (ref["external_id"] for ref in obj.get("external_references", [])
-             if ref.get("source_name") == "mitre-attack"),
-            None,
-        )
+        source = objects.get(rel.get("source_ref"), {})
+        if not source or not is_active(source):
+            continue
+        detail = rel.get("description") or source.get("description", "")
+        for analytic_ref in source.get("x_mitre_analytic_refs", [])[:2]:  # newer ATT&CK versions
+            analytic = objects.get(analytic_ref, {})
+            if analytic.get("description"):
+                detail += " " + analytic["description"]
+        lines.append(f"{source.get('name', 'Detection')}: {short(detail)}")
+    return lines[:MAX_ITEMS]
+
+
+def mitigation_lines(relationships: list[dict], objects: dict) -> list[str]:
+    """Mitigations ('course-of-action' objects) linked to the technique."""
+    lines = []
+    for rel in relationships:
+        if rel.get("relationship_type") != "mitigates":
+            continue
+        source = objects.get(rel.get("source_ref"), {})
+        if source and is_active(source):
+            mitigation_id = attack_id(source)
+            name = f"{source.get('name', '')} ({mitigation_id})" if mitigation_id else source.get("name", "")
+            lines.append(f"{name}: {short(rel.get('description') or source.get('description', ''))}")
+    return lines[:MAX_ITEMS]
+
+
+def attack_to_documents(bundle: dict) -> list[dict]:
+    """Turn each active MITRE ATT&CK technique into one text document, including how
+    to detect it and how to mitigate it."""
+    objects = {obj.get("id", f"_no_id_{i}"): obj for i, obj in enumerate(bundle.get("objects", []))}
+    relationships_by_target: dict[str, list[dict]] = {}
+    for obj in objects.values():
+        if obj.get("type") == "relationship" and is_active(obj):
+            relationships_by_target.setdefault(obj.get("target_ref"), []).append(obj)
+
+    docs = []
+    for obj in objects.values():
+        if obj.get("type") != "attack-pattern" or not is_active(obj):
+            continue  # skip non-techniques and techniques MITRE no longer uses
+        technique_id = attack_id(obj)
         if not technique_id:
             continue
         tactics = ", ".join(p["phase_name"] for p in obj.get("kill_chain_phases", []))
-        text = (
-            f"{technique_id} - {obj.get('name', '')} (MITRE ATT&CK)\n\n"
-            f"Tactics: {tactics}\n\n"
-            f"{obj.get('description', '')}"
-        )
+        related = relationships_by_target.get(obj.get("id"), [])
+        parts = [
+            f"{technique_id} - {obj.get('name', '')} (MITRE ATT&CK)",
+            f"Tactics: {tactics}",
+            obj.get("description", ""),
+        ]
+        detections = detection_lines(obj, related, objects)
+        if detections:
+            parts.append("Detection:\n" + "\n".join(f"- {line}" for line in detections))
+        mitigations = mitigation_lines(related, objects)
+        if mitigations:
+            parts.append("Mitigations:\n" + "\n".join(f"- {line}" for line in mitigations))
         docs.append({
             "id": technique_id,
-            "text": text,
+            "text": "\n\n".join(p for p in parts if p),
             "metadata": {
                 "source": "mitre_attack",
                 "technique_id": technique_id,
                 "name": obj.get("name", ""),
                 "tactics": tactics,
+                "has_detection": bool(detections),
+                "has_mitigation": bool(mitigations),
             },
         })
     return docs
@@ -97,7 +161,10 @@ def main() -> None:
 
     print("Downloading MITRE ATT&CK (Enterprise)... this file is large, please wait")
     attack_docs = attack_to_documents(download_json(MITRE_ATTACK_URL))
-    print(f"  {len(attack_docs)} techniques -> {add_documents(attack_docs)} chunks stored")
+    with_detection = sum(d["metadata"]["has_detection"] for d in attack_docs)
+    with_mitigation = sum(d["metadata"]["has_mitigation"] for d in attack_docs)
+    print(f"  {len(attack_docs)} techniques ({with_detection} with detection, "
+          f"{with_mitigation} with mitigations) -> {add_documents(attack_docs)} chunks stored")
 
 
 if __name__ == "__main__":

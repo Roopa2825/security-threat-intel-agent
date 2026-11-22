@@ -113,3 +113,29 @@ def test_citation_detection_accepts_source_prefix_and_advisory_ids():
 
     assert has_citation("Password guessing [source: T1110.001]")
     assert has_citation("Patch now [ cve-2023-4966-citrix-bleed ]")
+
+
+def test_attack_parsing_adds_detection_and_mitigations():
+    technique = {"type": "attack-pattern", "id": "attack-pattern--1", "name": "LSASS Memory",
+                 "description": "Adversaries read LSASS memory.",
+                 "x_mitre_detection": "Monitor for processes opening LSASS.",
+                 "external_references": [{"source_name": "mitre-attack", "external_id": "T1003.001"}]}
+    component = {"type": "x-mitre-data-component", "id": "dc--1", "name": "Process Access"}
+    mitigation = {"type": "course-of-action", "id": "coa--1", "name": "Credential Access Protection",
+                  "external_references": [{"source_name": "mitre-attack", "external_id": "M1043"}]}
+    old_mitigation = {"type": "course-of-action", "id": "coa--2", "name": "Old", "revoked": True}
+    relationships = [
+        {"type": "relationship", "id": "r1", "relationship_type": "detects", "source_ref": "dc--1",
+         "target_ref": "attack-pattern--1", "description": "Watch for access to lsass.exe."},
+        {"type": "relationship", "id": "r2", "relationship_type": "mitigates", "source_ref": "coa--1",
+         "target_ref": "attack-pattern--1", "description": "Enable Credential Guard."},
+        {"type": "relationship", "id": "r3", "relationship_type": "mitigates", "source_ref": "coa--2",
+         "target_ref": "attack-pattern--1", "description": "Should be skipped."},
+    ]
+    docs = attack_to_documents({"objects": [technique, component, mitigation, old_mitigation, *relationships]})
+    text = docs[0]["text"]
+    assert "Detection:" in text and "Monitor for processes opening LSASS." in text
+    assert "Process Access: Watch for access to lsass.exe." in text
+    assert "Credential Access Protection (M1043): Enable Credential Guard." in text
+    assert "Should be skipped" not in text
+    assert docs[0]["metadata"]["has_detection"] and docs[0]["metadata"]["has_mitigation"]
