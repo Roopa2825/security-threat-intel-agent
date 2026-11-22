@@ -1,11 +1,11 @@
 """Shared access to the embedding model and the ChromaDB collection."""
 from functools import lru_cache
 
+from app import config  # first, so its environment settings apply before the libraries load
+from app.chunking import chunk_text
+
 import chromadb
 from sentence_transformers import SentenceTransformer
-
-from app import config
-from app.chunking import chunk_text
 
 BATCH_SIZE = 500  # ChromaDB limits how many items can be added in one call
 
@@ -56,16 +56,19 @@ def add_documents(docs: list[dict]) -> int:
 
     Each doc is a dict with:
       - "id":       unique document id (e.g. "CVE-2021-44228")
-      - "text":     the full text
+      - "text":     the full text; its first line is used as the document title
       - "metadata": extra fields (strings/numbers only), e.g. {"source": "cisa_kev"}
+    Every chunk after the first gets the title added on top ("contextual chunk
+    header"), so a chunk from the middle of a document still says what it is about.
     Returns the number of chunks stored.
     """
     ids, texts, metadatas = [], [], []
     for doc in docs:
+        title = doc["text"].strip().split("\n", 1)[0].lstrip("# ").strip()
         for i, chunk in enumerate(chunk_text(doc["text"], config.CHUNK_SIZE, config.CHUNK_OVERLAP)):
             ids.append(f"{doc['id']}::{i}")
-            texts.append(chunk)
-            metadatas.append({**doc["metadata"], "doc_id": doc["id"], "chunk": i})
+            texts.append(chunk if i == 0 else f"{title}\n\n{chunk}")
+            metadatas.append({**doc["metadata"], "doc_id": doc["id"], "title": title, "chunk": i})
 
     collection = get_collection()
     for start in range(0, len(ids), BATCH_SIZE):

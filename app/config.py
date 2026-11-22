@@ -4,6 +4,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Keep terminal output clean: hide harmless Hugging Face warnings and progress bars.
+for _name, _value in {
+    "HF_HUB_DISABLE_SYMLINKS_WARNING": "1",
+    "HF_HUB_DISABLE_PROGRESS_BARS": "1",
+    "HF_HUB_VERBOSITY": "error",
+    "TRANSFORMERS_VERBOSITY": "error",
+    "TOKENIZERS_PARALLELISM": "false",
+}.items():
+    os.environ.setdefault(_name, _value)
+
 # Embedding model: turns text into vectors. BGE models are trained for search.
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 # BGE works best when search queries (not documents) get this instruction prefix.

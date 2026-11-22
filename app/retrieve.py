@@ -95,6 +95,7 @@ def search(query: str, k: int = 5, mode: str = "rerank", source: str | None = No
         {
             "text": r["text"],
             "doc_id": r["metadata"].get("doc_id"),
+            "title": r["metadata"].get("title", ""),
             "source": r["metadata"].get("source"),
             "score": r["score"],
         }
@@ -106,7 +107,7 @@ def main() -> None:
     query = " ".join(sys.argv[1:]) or "How can I tell if a link is phishing?"
     print(f"Query: {query}\n")
     for i, hit in enumerate(search(query), start=1):
-        print(f"{i}. [{hit['source']}] {hit['doc_id']}  (score {hit['score']})")
+        print(f"{i}. [{hit['source']}] {hit['title']}  (score {hit['score']})")
         print("   " + hit["text"][:200].replace("\n", " ") + "...\n")
 
 

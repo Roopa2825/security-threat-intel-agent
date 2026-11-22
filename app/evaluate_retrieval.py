@@ -16,8 +16,8 @@ MODES = ["vector", "hybrid", "rerank"]
 
 
 def is_correct(hit: dict, expected: list[str]) -> bool:
-    """A result counts as correct if its ID or title line mentions an expected term."""
-    title = hit["text"].split("\n", 1)[0]
+    """A result counts as correct if its ID or title mentions an expected term."""
+    title = hit.get("title") or hit["text"].split("\n", 1)[0]
     haystack = f"{hit['doc_id']} {title}".lower()
     return any(term.lower() in haystack for term in expected)
 

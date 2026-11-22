@@ -10,5 +10,5 @@
   {"question": "How do adversaries exploit internet-facing applications to get in?", "expected": ["Exploit Public-Facing Application"]},
   {"question": "How do attackers repeatedly guess passwords to break into accounts?", "expected": ["Brute Force"]},
   {"question": "How does ransomware encrypt files to disrupt a business?", "expected": ["Data Encrypted for Impact"]},
-  {"question": "How do attackers steal credentials from operating system memory?", "expected": ["OS Credential Dumping"]}
+  {"question": "How do attackers steal credentials from operating system memory?", "expected": ["OS Credential Dumping", "T1003"]}
 ]
