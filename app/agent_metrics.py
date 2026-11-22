@@ -8,11 +8,17 @@ GENERAL_GUIDANCE_HEADING = "general guidance (not from the knowledge base)"
 
 
 def normalize(text: str) -> str:
-    """Lowercase and replace the special dashes/spaces LLMs often output with plain ones."""
+    """Lowercase, and replace the special characters LLMs often output with plain ones."""
     text = text.lower()
-    for char in ["‐", "‑", "‒", "–", "—"]:
-        text = text.replace(char, "-")
-    return text.replace(" ", " ").replace("​", "")
+    for code in (0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2212):  # dash variants
+        text = text.replace(chr(code), "-")
+    for code in (0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF):  # invisible characters
+        text = text.replace(chr(code), "")
+    for code in (0x00A0, 0x202F):  # non-breaking spaces
+        text = text.replace(chr(code), " ")
+    for fancy, plain in ((0x3010, "["), (0x3011, "]"), (0xFF3B, "["), (0xFF3D, "]")):
+        text = text.replace(chr(fancy), plain)  # e.g. lenticular brackets -> [ ]
+    return text
 
 
 def tool_correct(tools_used: list[str], expected_tools: list[str]) -> bool:
