@@ -51,8 +51,14 @@ def model_name(llm) -> str:
 
 def judge(llm, answer: str, tool_outputs: list[str]) -> dict:
     context = "\n\n---\n\n".join(tool_outputs)[:12000] or "(no tool output)"
-    reply = llm.invoke(JUDGE_PROMPT.format(context=context, answer=sourced_part(answer)))
-    return parse_judge_output(str(reply.content))
+    prompt = JUDGE_PROMPT.format(context=context, answer=sourced_part(answer))
+    for attempt in range(1, 4):  # retry on rate limits
+        try:
+            return parse_judge_output(str(llm.invoke(prompt).content))
+        except Exception as exc:
+            if attempt == 3:
+                return {"faithfulness": None, "unsupported_claims": [f"judge failed: {str(exc)[:120]}"]}
+            time.sleep(10 * attempt)
 
 
 def run_question(agent, llm, item: dict) -> dict:

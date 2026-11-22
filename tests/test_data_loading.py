@@ -106,3 +106,10 @@ def test_citation_detection_handles_llm_formatting():
     assert has_citation("[​CVE‑2021‑44228]")              # zero-width space, non-breaking hyphens
     assert has_citation("[T1566 - Phishing]")
     assert not has_citation("No sources here")
+
+
+def test_citation_detection_accepts_source_prefix_and_advisory_ids():
+    from app.agent_metrics import has_citation
+
+    assert has_citation("Password guessing [source: T1110.001]")
+    assert has_citation("Patch now [ cve-2023-4966-citrix-bleed ]")

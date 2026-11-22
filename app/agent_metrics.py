@@ -2,8 +2,9 @@
 import json
 import re
 
-# A source ID inside square brackets, possibly followed by more text, e.g. [T1566] or [T1566 - Phishing].
-CITATION_PATTERN = re.compile(r"\[\s*(CVE-\d{4}-\d{4,}|T\d{4}(?:\.\d{3})?)\b", re.IGNORECASE)
+# A source ID in square brackets, optionally after "source:", e.g. [T1566], [source: T1110.001]
+# or [cve-2023-4966-citrix-bleed] (a local advisory ID that starts with a CVE ID).
+CITATION_PATTERN = re.compile(r"\[\s*(?:source:\s*)?(CVE-\d{4}-\d{4,}|T\d{4}(?:\.\d{3})?)", re.IGNORECASE)
 GENERAL_GUIDANCE_HEADING = "general guidance (not from the knowledge base)"
 
 

@@ -27,6 +27,7 @@ def search_threat_intel(query: str) -> str:
 def check_url(url: str) -> str:
     """Check a URL or domain for common phishing indicators such as lookalike
     domains, brand names in subdomains, raw IP addresses and '@' tricks.
+    Pass the URL exactly as the user wrote it; never correct spelling or digits.
     The URL is analyzed as text only and is never visited."""
     return json.dumps(analyze_url(url), indent=2)
 
