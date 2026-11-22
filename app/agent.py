@@ -20,10 +20,13 @@ SYSTEM_PROMPT = """You are a security threat-intelligence assistant for security
 - Use search_threat_intel for questions about vulnerabilities, attacker techniques,
   detection or remediation. Use lookup_cve when the user gives an exact CVE ID.
   Use check_url when the user asks whether a link or domain is safe.
-- Base every factual claim on tool results. Cite document IDs in square brackets,
-  e.g. [CVE-2021-44228] or [T1566]. If the tools do not contain the answer, say so;
-  never invent CVE details, versions or dates.
-- Be concise: give a short answer, then recommended actions as bullet points."""
+- Specific facts (affected or fixed version numbers, dates, configuration settings,
+  CVE and technique details) must come from tool results. Cite them in square
+  brackets, e.g. [CVE-2021-44228] or [T1566]. Never state a version number or
+  setting that is not in the tool results; if the tools do not contain it, say so.
+- You may add widely accepted security best practices, but put them under a
+  heading "General guidance (not from the knowledge base)".
+- Be concise: a short answer first, then recommended actions as bullet points."""
 
 MAX_STEPS = 12  # safety limit on agent <-> tool round trips
 

@@ -40,12 +40,22 @@ def lookup_cve(cve_id: str) -> str:
     from app.vectorstore import get_collection
 
     cve_id = cve_id.strip().upper()
-    found = get_collection().get(where={"doc_id": cve_id}, include=["documents"])
-    if found["documents"]:
-        return "\n\n".join(found["documents"])
+    collection = get_collection()
+    # 1) the official CISA KEV record (stored with the CVE ID as its document ID)
+    kev = collection.get(where={"doc_id": cve_id}, include=["documents"])
+    # 2) any local advisory that mentions this CVE (e.g. detailed fix versions)
+    advisories = collection.get(
+        where={"source": "local_advisory"},
+        where_document={"$contains": cve_id},
+        include=["documents"],
+    )
+    documents = kev["documents"] + advisories["documents"]
+    if documents:
+        return "\n\n---\n\n".join(documents)
     return (
-        f"{cve_id} is not in the CISA Known Exploited Vulnerabilities catalog loaded here. "
-        "It may exist but not be known to be actively exploited. Try search_threat_intel."
+        f"{cve_id} is not in the CISA Known Exploited Vulnerabilities catalog or local "
+        "advisories loaded here. It may exist but not be known to be actively exploited. "
+        "Try search_threat_intel."
     )
 
 
