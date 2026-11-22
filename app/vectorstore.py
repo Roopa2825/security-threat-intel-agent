@@ -26,8 +26,29 @@ def get_collection():
 
 
 def embed(texts: list[str]) -> list[list[float]]:
-    """Turn texts into normalized embedding vectors."""
+    """Turn document texts into normalized embedding vectors."""
     return get_model().encode(texts, normalize_embeddings=True).tolist()
+
+
+def embed_query(query: str) -> list[float]:
+    """Embed a search query (BGE models expect an instruction prefix on queries)."""
+    return embed([config.QUERY_PREFIX + query])[0]
+
+
+def reset_collection() -> None:
+    """Delete all stored chunks (needed after changing the embedding model)."""
+    client = chromadb.PersistentClient(path=config.CHROMA_DIR)
+    try:
+        client.delete_collection(config.COLLECTION_NAME)
+    except Exception:
+        pass  # collection did not exist yet
+    get_collection.cache_clear()
+
+
+def get_all_chunks() -> tuple[list[str], list[str], list[dict]]:
+    """Return every stored chunk (ids, texts, metadata), used for keyword search."""
+    data = get_collection().get(include=["documents", "metadatas"])
+    return data["ids"], data["documents"], data["metadatas"]
 
 
 def add_documents(docs: list[dict]) -> int:

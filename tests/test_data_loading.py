@@ -46,3 +46,28 @@ def test_attack_parsing_skips_revoked_and_deprecated():
     docs = attack_to_documents(bundle)
     assert [d["id"] for d in docs] == ["T1566"]
     assert docs[0]["metadata"]["tactics"] == "initial-access"
+
+
+def test_tokenize_keeps_cve_ids_together():
+    from app.keyword_search import tokenize
+    assert "cve-2021-44228" in tokenize("Patch CVE-2021-44228 now")
+
+
+def test_alias_expansion_adds_official_names():
+    from app.keyword_search import expand_query
+    assert "cve-2021-44228" in expand_query("Detect Log4Shell")
+
+
+def test_reciprocal_rank_fusion_rewards_agreement():
+    from app.retrieve import reciprocal_rank_fusion
+    a = [{"id": "x"}, {"id": "y"}]
+    b = [{"id": "y"}, {"id": "z"}]
+    fused = reciprocal_rank_fusion([a, b])
+    assert fused[0]["id"] == "y"  # ranked by both lists, so it wins
+
+
+def test_is_correct_matches_id_or_title():
+    from app.evaluate_retrieval import is_correct
+    hit = {"doc_id": "T1566", "text": "T1566 - Phishing (MITRE ATT&CK)\n\nTactics: initial-access"}
+    assert is_correct(hit, ["Phishing"])
+    assert not is_correct(hit, ["Brute Force"])

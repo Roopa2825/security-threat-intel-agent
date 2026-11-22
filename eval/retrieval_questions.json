@@ -1,0 +1,14 @@
+[
+  {"question": "How do I detect Log4Shell exploitation?", "expected": ["CVE-2021-44228", "log4shell"]},
+  {"question": "Which Apache Log4j2 vulnerability allows remote code execution?", "expected": ["CVE-2021-44228", "log4shell"]},
+  {"question": "Which OpenSSL bug leaks private keys from server memory?", "expected": ["CVE-2014-0160", "heartbleed"]},
+  {"question": "What vulnerability did WannaCry ransomware use to spread?", "expected": ["CVE-2017-0144", "eternalblue"]},
+  {"question": "How can stolen session tokens bypass MFA on NetScaler appliances?", "expected": ["CVE-2023-4966", "citrix-bleed"]},
+  {"question": "Was there a backdoor in a Linux compression library that affected SSH?", "expected": ["CVE-2024-3094", "xz-backdoor"]},
+  {"question": "How can I tell if a link is a phishing URL?", "expected": ["phishing-url-indicators", "Phishing"]},
+  {"question": "How do attackers send malicious links in emails to gain initial access?", "expected": ["Phishing"]},
+  {"question": "How do adversaries exploit internet-facing applications to get in?", "expected": ["Exploit Public-Facing Application"]},
+  {"question": "How do attackers repeatedly guess passwords to break into accounts?", "expected": ["Brute Force"]},
+  {"question": "How does ransomware encrypt files to disrupt a business?", "expected": ["Data Encrypted for Impact"]},
+  {"question": "How do attackers steal credentials from operating system memory?", "expected": ["OS Credential Dumping"]}
+]
