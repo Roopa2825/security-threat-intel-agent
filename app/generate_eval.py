@@ -6,6 +6,7 @@ Creates:
 
 A fixed random seed makes the output reproducible for the same data version.
 Run (after python -m app.build_index):  python -m app.generate_eval
+                                        python -m app.generate_eval --seed 7   (a fresh set)
 """
 import json
 import random
@@ -57,17 +58,22 @@ def kev_retrieval_questions(kev: list[dict], rng: random.Random) -> list[dict]:
 
 
 def attack_retrieval_questions(attack: list[tuple[str, dict]], rng: random.Random) -> list[dict]:
-    """Describe a technique's behavior (with its name hidden) and expect its exact ID."""
+    """Describe a technique's behavior and expect its exact ID. Only sentences that do not
+    contain the technique's name are used (so nothing needs hiding), and sentences shared
+    by several techniques are skipped (they would have more than one right answer)."""
+    sentences = [(first_sentence(technique_description(doc)), meta) for doc, meta in attack]
+    counts = Counter(sentence.lower() for sentence, _ in sentences)
     candidates = []
-    for document, meta in attack:
-        sentence = hide_name(first_sentence(technique_description(document)), meta["name"])
-        if len(sentence) >= 40:
-            candidates.append({
-                "question": f"Which MITRE ATT&CK technique matches this behavior: {sentence}",
-                "expected": [meta["technique_id"]],
-                "exact": True,
-                "kind": "attack",
-            })
+    for sentence, meta in sentences:
+        name = meta["name"].lower()
+        if len(sentence) < 40 or counts[sentence.lower()] > 1 or (name and name in sentence.lower()):
+            continue
+        candidates.append({
+            "question": f"Which MITRE ATT&CK technique matches this behavior: {sentence}",
+            "expected": [meta["technique_id"]],
+            "exact": True,
+            "kind": "attack",
+        })
     return rng.sample(candidates, min(N_ATTACK_RETRIEVAL, len(candidates)))
 
 
@@ -115,7 +121,14 @@ def agent_questions(kev: list[dict], attack: list[tuple[str, dict]], rng: random
 
 
 def main() -> None:
+    import argparse
+
     from app.vectorstore import get_collection
+
+    parser = argparse.ArgumentParser(description="Generate evaluation question sets.")
+    parser.add_argument("--seed", type=int, default=SEED,
+                        help="use a new seed to get a fresh held-out set after tuning on the old one")
+    args = parser.parse_args()
 
     collection = get_collection()
     kev = collection.get(where={"$and": [{"source": "cisa_kev"}, {"chunk": 0}]}, include=["metadatas"])["metadatas"]
@@ -126,7 +139,8 @@ def main() -> None:
         print("Knowledge base is empty. Run: python -m app.build_index")
         return
 
-    rng = random.Random(SEED)
+    rng = random.Random(args.seed)
+    print(f"Random seed: {args.seed}")
     retrieval = kev_retrieval_questions(kev, rng) + attack_retrieval_questions(attack, rng)
     agent = agent_questions(kev, attack, rng)
 

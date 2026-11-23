@@ -36,7 +36,10 @@ Answer format:
 3. "General guidance (not from the knowledge base)" (optional): widely accepted best
    practices only. No version numbers, configuration settings, dates or CVE details here.
 
-If the tools do not contain the answer, say so instead of guessing."""
+If the tools do not contain the answer, say so instead of guessing. For detection or
+mitigation questions, if the tool results contain little or no detection or mitigation
+guidance (for example, activity that happens outside the victim's network), say that
+plainly in the opening sentences, and put any general ideas only under "General guidance"."""
 
 MAX_STEPS = 12  # safety limit on agent <-> tool round trips
 RETRIES = 2  # extra attempts if the LLM provider returns an error

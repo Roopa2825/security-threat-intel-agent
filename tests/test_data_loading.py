@@ -159,3 +159,32 @@ def test_question_generation_helpers():
 
     hit = {"doc_id": "T1110.001", "title": "T1110.001 - Password Guessing", "text": ""}
     assert is_correct(hit, ["T1110"]) and not is_correct(hit, ["T1110"], exact=True)
+
+
+def test_attack_questions_skip_named_and_duplicate_sentences():
+    import random
+
+    from app.generate_eval import attack_retrieval_questions
+
+    def doc(sentence):
+        return f"title\n\nTactics: x\n\n{sentence} More."
+
+    attack = [
+        (doc("Adversaries may use Brute Force to guess many passwords quickly."), {"name": "Brute Force", "technique_id": "T1"}),
+        (doc("Adversaries may gather information that can be used during targeting."), {"name": "A", "technique_id": "T2"}),
+        (doc("Adversaries may gather information that can be used during targeting."), {"name": "B", "technique_id": "T3"}),
+        (doc("Adversaries may read process memory to collect stored credential material."), {"name": "LSASS Memory", "technique_id": "T4"}),
+    ]
+    questions = attack_retrieval_questions(attack, random.Random(0))
+    assert [q["expected"] for q in questions] == [["T4"]]
+
+
+def test_average_ignores_broken_passes():
+    from app.evaluate_agent import average_complete_passes, is_daily_limit
+
+    good = {"questions": 10, "errors": 0, "faithfulness": 0.9, "tool_accuracy": 1.0}
+    broken = {"questions": 10, "errors": 6, "faithfulness": 0.5, "tool_accuracy": 1.0}
+    summary = average_complete_passes([good, broken])
+    assert summary["complete_passes"] == 1 and summary["faithfulness"] == 0.9
+    assert is_daily_limit("Rate limit reached ... on tokens per day (TPD): Limit 200000")
+    assert not is_daily_limit("Rate limit reached ... on tokens per minute (TPM)")

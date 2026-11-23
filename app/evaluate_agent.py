@@ -90,6 +90,24 @@ def run_question(agent, llm, item: dict) -> dict:
     }
 
 
+def is_daily_limit(error: str) -> bool:
+    """Free tiers also cap tokens per day; retrying will not help until the next day."""
+    text = error.lower()
+    return "per day" in text or "tokens per day" in text or "(tpd)" in text or "requests per day" in text
+
+
+def average_complete_passes(summaries: list[dict], max_error_share: float = 0.2) -> dict:
+    """Average the passes that mostly succeeded; a pass broken by rate limits would distort it."""
+    complete = [s for s in summaries if s["questions"] and s["errors"] / s["questions"] <= max_error_share]
+    if not complete:
+        return {"complete_passes": 0}
+    summary = {key: round(statistics.mean(s[key] for s in complete), 3) for key in complete[0]}
+    summary["complete_passes"] = len(complete)
+    if len(complete) > 1:
+        summary["faithfulness_std"] = round(statistics.stdev(s["faithfulness"] for s in complete), 3)
+    return summary
+
+
 def summarize(rows: list[dict]) -> dict:
     ok = [r for r in rows if "error" not in r]
     faith = [r["faithfulness"] for r in ok if r["faithfulness"] is not None]
@@ -160,6 +178,7 @@ def main() -> None:
         for repeat in range(1, args.repeats + 1):
             print(f"\nAgent evaluation, pass {repeat}/{args.repeats} ({len(questions)} questions)...")
             pass_rows = []
+            daily_limit_hit = False
             for i, item in enumerate(questions, start=1):
                 row = run_question(agent, llm, item)
                 row["repeat"] = repeat
@@ -168,15 +187,21 @@ def main() -> None:
                     f"tool {'OK' if row['tool_correct'] else 'WRONG'}, facts {row['fact_recall']}, "
                     f"faithfulness {row['faithfulness']}")
                 print(f"  {i:>2}. {status} | {item['question'][:60]}")
+                if "error" in row and is_daily_limit(row["error"]):
+                    print("\n  Daily token limit reached; stopping. Try again tomorrow or use another provider.")
+                    daily_limit_hit = True
+                    break
             pass_summary = summarize(pass_rows)
             mlflow.log_metrics({k: v for k, v in pass_summary.items()}, step=repeat)
+            pass_summary["questions"] = len(questions)  # count unanswered questions as missing
+            pass_summary["errors"] = len(questions) - (len(pass_rows) - pass_summary["errors"])
             summaries.append(pass_summary)
             rows += pass_rows
+            if daily_limit_hit:
+                break
 
-        # Average over passes; the spread shows how much results vary from run to run.
-        summary = {key: round(statistics.mean(s[key] for s in summaries), 3) for key in summaries[0]}
-        if len(summaries) > 1:
-            summary["faithfulness_std"] = round(statistics.stdev(s["faithfulness"] for s in summaries), 3)
+        # Average only complete passes; the spread shows how much results vary between runs.
+        summary = average_complete_passes(summaries)
         mlflow.log_metrics({f"avg_{k}": v for k, v in summary.items()})
         mlflow.log_dict({"summary": summary, "per_pass": summaries, "results": rows}, "agent_eval_results.json")
         mlflow.log_table(
@@ -186,7 +211,7 @@ def main() -> None:
             artifact_file="agent_eval_table.json",
         )
 
-    print(f"\nSummary (average of {args.repeats} pass(es))")
+    print(f"\nSummary (average of {summary.get('complete_passes', 0)} complete pass(es) out of {len(summaries)})")
     for key, value in summary.items():
         print(f"  {key:<18} {value}")
     print("\nOpen the dashboard: mlflow ui --backend-store-uri sqlite:///mlflow.db")
