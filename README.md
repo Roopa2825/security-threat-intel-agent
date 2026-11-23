@@ -1,10 +1,56 @@
 # Security Threat Intelligence Agent
 
-An AI agent that helps security analysts investigate threats. It uses
-retrieval-augmented generation (RAG) over real threat-intelligence data
-(CISA Known Exploited Vulnerabilities and MITRE ATT&CK) and will use tools
-to check suspicious URLs and look up CVEs.
+An AI agent that helps security analysts investigate threats. It answers questions
+about vulnerabilities and attacker techniques with retrieval-augmented generation (RAG)
+over real threat-intelligence data, looks up CVEs, checks suspicious URLs, and classifies
+phishing emails with a fine-tuned Transformer. Every factual claim cites its source.
 
+**Stack:** Python, LangGraph, ChromaDB, BM25, sentence-transformers, Hugging Face Transformers
+(DistilBERT), FastAPI, MLflow, Docker, Groq / Gemini / Ollama LLMs
+
+## Results
+
+All numbers come from held-out data that was not used while building or tuning.
+
+| What was measured | Result |
+|---|---|
+| Retrieval Hit@5, 150 auto-generated questions (two separate sets) | **97-99%** (MRR 0.90-0.94) |
+| Retrieval Hit@5, vector search only (same questions) | 68-80% |
+| Agent tool-selection accuracy, 30 unseen questions | **100%** |
+| Agent faithfulness (LLM-as-judge), 30 unseen questions | **0.92** |
+| Phishing email classifier (DistilBERT), 2,000 test emails | **F1 0.97, recall 0.98, ROC-AUC 0.997** |
+| TF-IDF + logistic regression baseline (same emails) | F1 0.96, recall 0.96 |
+
+What made the difference, measured along the way:
+
+- Hybrid search (BM25 + vectors), contextual chunk titles and a cross-encoder reranker raised
+  retrieval Hit@5 from 50% to 100% on the development set.
+- Grounding rules, separating sourced facts from general guidance, raised faithfulness on
+  the development set from 0.61 to 0.96.
+- Evaluation found that the LLM "auto-corrected" typosquatted URLs (micros0ft -> microsoft)
+  before checking them; the tool and prompt now require URLs to be passed exactly.
+
+Limitations: evaluation sets are small (12-150 questions), LLM answers vary between runs,
+and the phishing dataset contains older emails, so real-world accuracy may be lower.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    U[User or app] -->|REST| API[FastAPI]
+    API --> A[LangGraph agent]
+    A -->|chooses tools| T1[search_threat_intel]
+    A --> T2[lookup_cve]
+    A --> T3[check_url]
+    A --> T4[classify_phishing_text]
+    T1 --> H[Hybrid search: BM25 + vectors + reranker]
+    H --> DB[(ChromaDB: CISA KEV + MITRE ATT&CK)]
+    T2 --> DB
+    T3 --> R[Rule-based URL analyzer]
+    T4 --> M[Fine-tuned DistilBERT]
+    A --> L[LLM: Groq / Gemini / Ollama]
+    E[MLflow evaluation] -.measures.-> A
+```
 
 ## Setup
 
