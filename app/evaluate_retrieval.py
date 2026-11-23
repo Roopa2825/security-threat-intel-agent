@@ -6,8 +6,10 @@ Metrics (higher is better, max 1.0):
            0.5 if it is usually second, and so on
 
 Run:  python -m app.evaluate_retrieval
+      python -m app.evaluate_retrieval eval/retrieval_questions_generated.json
 """
 import json
+import sys
 
 from app.retrieve import search
 
@@ -15,16 +17,19 @@ QUESTIONS_FILE = "eval/retrieval_questions.json"
 MODES = ["vector", "hybrid", "rerank"]
 
 
-def is_correct(hit: dict, expected: list[str]) -> bool:
-    """A result counts as correct if its ID or title mentions an expected term."""
+def is_correct(hit: dict, expected: list[str], exact: bool = False) -> bool:
+    """A result counts as correct if its ID or title mentions an expected term.
+    With exact=True the document ID must equal an expected ID (T1110 does not match T1110.001)."""
+    if exact:
+        return (hit["doc_id"] or "").lower() in {term.lower() for term in expected}
     title = hit.get("title") or hit["text"].split("\n", 1)[0]
     haystack = f"{hit['doc_id']} {title}".lower()
     return any(term.lower() in haystack for term in expected)
 
 
-def first_correct_rank(hits: list[dict], expected: list[str]) -> int | None:
+def first_correct_rank(hits: list[dict], expected: list[str], exact: bool = False) -> int | None:
     for rank, hit in enumerate(hits, start=1):
-        if is_correct(hit, expected):
+        if is_correct(hit, expected, exact):
             return rank
     return None
 
@@ -32,7 +37,7 @@ def first_correct_rank(hits: list[dict], expected: list[str]) -> int | None:
 def evaluate(mode: str, questions: list[dict], k: int = 5) -> dict:
     hits_at_k, reciprocal_ranks, misses = 0, [], []
     for q in questions:
-        rank = first_correct_rank(search(q["question"], k=k, mode=mode), q["expected"])
+        rank = first_correct_rank(search(q["question"], k=k, mode=mode), q["expected"], q.get("exact", False))
         if rank:
             hits_at_k += 1
             reciprocal_ranks.append(1 / rank)
@@ -44,9 +49,10 @@ def evaluate(mode: str, questions: list[dict], k: int = 5) -> dict:
 
 
 def main() -> None:
-    with open(QUESTIONS_FILE, encoding="utf-8") as f:
+    path = sys.argv[1] if len(sys.argv) > 1 else QUESTIONS_FILE
+    with open(path, encoding="utf-8") as f:
         questions = json.load(f)
-    print(f"Evaluating {len(questions)} questions\n")
+    print(f"Evaluating {len(questions)} questions from {path}\n")
     print(f"{'Mode':<8} {'Hit@5':>6} {'MRR':>6}")
     results = {}
     for mode in MODES:
@@ -55,8 +61,10 @@ def main() -> None:
     for mode, r in results.items():
         if r["misses"]:
             print(f"\nMissed by {mode}:")
-            for m in r["misses"]:
+            for m in r["misses"][:15]:
                 print(f"  - {m}")
+            if len(r["misses"]) > 15:
+                print(f"  ... and {len(r['misses']) - 15} more")
 
 
 if __name__ == "__main__":

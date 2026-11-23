@@ -41,6 +41,20 @@ def edit_distance(a: str, b: str) -> int:
     return previous[-1]
 
 
+def is_lookalike(word: str, brand: str) -> bool:
+    """True if a word imitates a brand: lookalike characters (micros0ft), a capital I used
+    as a lowercase l (appIe, which becomes 'appie' once lowercased), or one typo (paypa1)."""
+    if not word or word == brand:
+        return False
+    normalized = word.translate(LOOKALIKE_SWAPS)
+    candidates = {normalized}
+    if "l" in brand:
+        candidates.add(normalized.replace("i", "l"))
+    if brand in candidates:
+        return True
+    return len(brand) >= 5 and edit_distance(word, brand) <= 1
+
+
 def analyze_url(url: str) -> dict:
     """Return a 0-100 risk score, a verdict and the reasons behind it."""
     raw = url.strip()
@@ -81,7 +95,7 @@ def analyze_url(url: str) -> dict:
             reasons.append((35, f"Mentions '{brand}' in a subdomain, but the real domain is {domain}."))
             break
         normalized = domain_name.translate(LOOKALIKE_SWAPS)  # e.g. "micros0ft" -> "microsoft"
-        if normalized == brand or (len(brand) >= 5 and 0 < edit_distance(domain_name, brand) <= 1):
+        if normalized == brand or any(is_lookalike(word, brand) for word in [domain_name, *re.split(r"[-_]", domain_name)]):
             reasons.append((45, f"Domain '{domain}' looks like '{real_domain}' (possible typosquatting)."))
             break
         if brand in normalized and normalized != domain_name:

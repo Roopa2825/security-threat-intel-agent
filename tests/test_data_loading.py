@@ -139,3 +139,23 @@ def test_attack_parsing_adds_detection_and_mitigations():
     assert "Credential Access Protection (M1043): Enable Credential Guard." in text
     assert "Should be skipped" not in text
     assert docs[0]["metadata"]["has_detection"] and docs[0]["metadata"]["has_mitigation"]
+
+
+def test_question_generation_helpers():
+    import random
+
+    from app.evaluate_retrieval import is_correct
+    from app.generate_eval import first_sentence, hide_name, kev_retrieval_questions
+
+    text = "Adversaries may use Brute Force (Citation: X) to guess [passwords](https://x). More text."
+    assert first_sentence(text) == "Adversaries may use Brute Force to guess passwords."
+    assert hide_name("Adversaries may use Brute Force.", "Brute Force") == "Adversaries may use this technique."
+
+    kev = [{"vendor": "A", "product": "One", "cve_id": "CVE-1"},
+           {"vendor": "B", "product": "Two", "cve_id": "CVE-2"},
+           {"vendor": "B", "product": "Two", "cve_id": "CVE-3"}]
+    questions = kev_retrieval_questions(kev, random.Random(0))
+    assert [q["expected"] for q in questions] == [["CVE-1"]]  # B/Two is ambiguous, so skipped
+
+    hit = {"doc_id": "T1110.001", "title": "T1110.001 - Password Guessing", "text": ""}
+    assert is_correct(hit, ["T1110"]) and not is_correct(hit, ["T1110"], exact=True)

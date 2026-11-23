@@ -37,3 +37,13 @@ def test_cve_id_validation():
 def test_lookalike_characters_with_extra_words():
     result = analyze_url("https://micros0ft-support.xyz/update")
     assert result["verdict"] == "high risk"
+
+
+def test_capital_i_lookalike_inside_hyphenated_domain():
+    assert analyze_url("http://appIe-id-unlock.com/signin")["verdict"] == "high risk"
+
+
+def test_real_sites_stay_low_risk():
+    for url in ["https://www.linkedin.com/feed", "https://www.netflix.com", "https://docs.github.com",
+                "https://www.apple.com", "https://www.amazon.com/orders"]:
+        assert analyze_url(url)["verdict"] == "low risk", url

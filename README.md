@@ -113,6 +113,23 @@ Each run records the model and settings, so different models or prompts can be c
 python -m app.show_eval    # per-question scores, unsupported claims, and latest vs previous run
 ```
 
+## Larger, held-out test sets
+
+The hand-written question sets were also used while improving the agent, so their scores
+can be optimistic. To get honest numbers, generate fresh questions from the data itself:
+
+```bash
+python -m app.generate_eval
+python -m app.evaluate_retrieval eval/retrieval_questions_generated.json
+python -m app.evaluate_agent --questions eval/agent_questions_heldout.json --retrieval-questions eval/retrieval_questions_generated.json --repeats 2
+```
+
+- About 150 retrieval questions (CISA KEV products and MITRE ATT&CK behaviors, with the
+  technique name hidden) scored against exact document IDs.
+- About 30 held-out agent questions (CVE lookups, detection questions and URL checks).
+- `--repeats 2` runs the agent questions twice and reports the average and the spread,
+  because LLM answers vary from run to run.
+
 ## Run the tests
 
 ```bash

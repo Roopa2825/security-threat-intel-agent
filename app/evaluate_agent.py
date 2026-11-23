@@ -10,6 +10,8 @@ For every question in eval/agent_questions.json it measures:
 It also re-runs the retrieval evaluation (Hit@5, MRR), then logs everything to MLflow.
 
 Run:        python -m app.evaluate_agent
+            python -m app.evaluate_agent --questions eval/agent_questions_heldout.json \
+                --retrieval-questions eval/retrieval_questions_generated.json --repeats 2
 Dashboard:  mlflow ui --backend-store-uri sqlite:///mlflow.db   then open http://127.0.0.1:5000
 """
 import json
@@ -103,6 +105,16 @@ def summarize(rows: list[dict]) -> dict:
     }
 
 
+def parse_args():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Evaluate the agent and log results to MLflow.")
+    parser.add_argument("--questions", default=QUESTIONS_FILE, help="agent question file")
+    parser.add_argument("--retrieval-questions", default=None, help="retrieval question file")
+    parser.add_argument("--repeats", type=int, default=1, help="run the agent questions N times and average")
+    return parser.parse_args()
+
+
 def main() -> None:
     import mlflow
 
@@ -112,17 +124,20 @@ def main() -> None:
     from app.evaluate_retrieval import evaluate as evaluate_retrieval
     from app.llm import get_llm
 
-    with open(QUESTIONS_FILE, encoding="utf-8") as f:
+    args = parse_args()
+    retrieval_file = args.retrieval_questions or RETRIEVAL_FILE
+    with open(args.questions, encoding="utf-8") as f:
         questions = json.load(f)
-    with open(RETRIEVAL_FILE, encoding="utf-8") as f:
+    with open(retrieval_file, encoding="utf-8") as f:
         retrieval_questions = json.load(f)
 
     llm = get_llm()
     agent = build_agent()
+    question_set = os.path.splitext(os.path.basename(args.questions))[0]
 
     mlflow.set_tracking_uri(TRACKING_URI)
     mlflow.set_experiment(EXPERIMENT)
-    with mlflow.start_run(run_name=f"{os.getenv('LLM_PROVIDER', 'groq')}:{model_name(llm)}"):
+    with mlflow.start_run(run_name=f"{os.getenv('LLM_PROVIDER', 'groq')}:{model_name(llm)}:{question_set}"):
         mlflow.log_params({
             "llm_provider": os.getenv("LLM_PROVIDER", "groq"),
             "llm_model": model_name(llm),
@@ -130,35 +145,48 @@ def main() -> None:
             "reranker_model": config.RERANKER_MODEL,
             "chunk_size": config.CHUNK_SIZE,
             "chunk_overlap": config.CHUNK_OVERLAP,
+            "agent_questions_file": args.questions,
+            "retrieval_questions_file": retrieval_file,
+            "repeats": args.repeats,
         })
 
-        print("Retrieval evaluation...")
+        print(f"Retrieval evaluation ({len(retrieval_questions)} questions)...")
         for mode in MODES:
             r = evaluate_retrieval(mode, retrieval_questions)
             mlflow.log_metrics({f"retrieval_{mode}_hit_at_5": r["hit_at_5"], f"retrieval_{mode}_mrr": r["mrr"]})
             print(f"  {mode:<7} Hit@5 {r['hit_at_5']}  MRR {r['mrr']}")
 
-        print(f"\nAgent evaluation ({len(questions)} questions, this takes a few minutes)...")
-        rows = []
-        for i, item in enumerate(questions, start=1):
-            row = run_question(agent, llm, item)
-            rows.append(row)
-            status = "ERROR" if "error" in row else (
-                f"tool {'OK' if row['tool_correct'] else 'WRONG'}, facts {row['fact_recall']}, "
-                f"faithfulness {row['faithfulness']}")
-            print(f"  {i:>2}. {status} | {item['question'][:60]}")
+        rows, summaries = [], []
+        for repeat in range(1, args.repeats + 1):
+            print(f"\nAgent evaluation, pass {repeat}/{args.repeats} ({len(questions)} questions)...")
+            pass_rows = []
+            for i, item in enumerate(questions, start=1):
+                row = run_question(agent, llm, item)
+                row["repeat"] = repeat
+                pass_rows.append(row)
+                status = "ERROR" if "error" in row else (
+                    f"tool {'OK' if row['tool_correct'] else 'WRONG'}, facts {row['fact_recall']}, "
+                    f"faithfulness {row['faithfulness']}")
+                print(f"  {i:>2}. {status} | {item['question'][:60]}")
+            pass_summary = summarize(pass_rows)
+            mlflow.log_metrics({k: v for k, v in pass_summary.items()}, step=repeat)
+            summaries.append(pass_summary)
+            rows += pass_rows
 
-        summary = summarize(rows)
-        mlflow.log_metrics({k: v for k, v in summary.items()})
-        mlflow.log_dict({"summary": summary, "results": rows}, "agent_eval_results.json")
+        # Average over passes; the spread shows how much results vary from run to run.
+        summary = {key: round(statistics.mean(s[key] for s in summaries), 3) for key in summaries[0]}
+        if len(summaries) > 1:
+            summary["faithfulness_std"] = round(statistics.stdev(s["faithfulness"] for s in summaries), 3)
+        mlflow.log_metrics({f"avg_{k}": v for k, v in summary.items()})
+        mlflow.log_dict({"summary": summary, "per_pass": summaries, "results": rows}, "agent_eval_results.json")
         mlflow.log_table(
             {key: [str(r.get(key, "")) for r in rows]
-             for key in ["question", "expected_tools", "tools_used", "tool_correct", "fact_recall",
+             for key in ["repeat", "question", "expected_tools", "tools_used", "tool_correct", "fact_recall",
                          "has_citation", "faithfulness", "unsupported_claims", "latency_ms", "error"]},
             artifact_file="agent_eval_table.json",
         )
 
-    print("\nSummary")
+    print(f"\nSummary (average of {args.repeats} pass(es))")
     for key, value in summary.items():
         print(f"  {key:<18} {value}")
     print("\nOpen the dashboard: mlflow ui --backend-store-uri sqlite:///mlflow.db")

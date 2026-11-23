@@ -41,7 +41,8 @@ def main() -> None:
             print(f"{i:>2}. ERROR {r['question']}\n    {r['error']}\n")
             continue
         cited = "yes" if r.get("has_citation") else ("no" if r.get("expects_citation", True) else "n/a")
-        print(f"{i:>2}. faithfulness {r['faithfulness']} | facts {r['fact_recall']} | cited {cited} "
+        prefix = f"[pass {r['repeat']}] " if r.get("repeat", 1) > 1 else ""
+        print(f"{prefix}{i:>2}. faithfulness {r['faithfulness']} | facts {r['fact_recall']} | cited {cited} "
               f"| tools: {r['tools_used']} | {r['question']}")
         if r.get("unsupported_claims"):
             for claim in r["unsupported_claims"].split("; "):
@@ -55,7 +56,8 @@ def main() -> None:
         previous = runs[1]
         print(f"{'Metric':<28}{'previous':>10}{'latest':>10}")
         for name in COMPARE:
-            old, new = previous.data.metrics.get(name), latest.data.metrics.get(name)
+            old = previous.data.metrics.get(f"avg_{name}", previous.data.metrics.get(name))
+            new = latest.data.metrics.get(f"avg_{name}", latest.data.metrics.get(name))
             fmt = lambda v: "-" if v is None else f"{v:.3g}"  # noqa: E731
             print(f"{name:<28}{fmt(old):>10}{fmt(new):>10}")
 
