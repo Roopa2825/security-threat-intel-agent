@@ -39,9 +39,10 @@ def pick_groq_model() -> str:
     return chat_models[0]
 
 
-def get_llm():
+def get_llm(model: str | None = None):
+    """model overrides LLM_MODEL, e.g. to give the evaluation judge its own model (and quota)."""
     provider = os.getenv("LLM_PROVIDER", "groq").lower()
-    model = os.getenv("LLM_MODEL")
+    model = model or os.getenv("LLM_MODEL")
     if provider == "groq":
         from langchain_groq import ChatGroq
 

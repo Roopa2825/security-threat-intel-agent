@@ -149,16 +149,20 @@ def main() -> None:
     with open(retrieval_file, encoding="utf-8") as f:
         retrieval_questions = json.load(f)
 
-    llm = get_llm()
+    # The judge can use a different model (set JUDGE_MODEL in .env). On free tiers, limits are
+    # usually per model, so this spreads the load; a different judge also avoids self-grading.
+    llm = get_llm(os.getenv("JUDGE_MODEL") or None)
     agent = build_agent()
     question_set = os.path.splitext(os.path.basename(args.questions))[0]
 
     mlflow.set_tracking_uri(TRACKING_URI)
     mlflow.set_experiment(EXPERIMENT)
-    with mlflow.start_run(run_name=f"{os.getenv('LLM_PROVIDER', 'groq')}:{model_name(llm)}:{question_set}"):
+    agent_model = os.getenv("LLM_MODEL") or "auto"
+    with mlflow.start_run(run_name=f"{os.getenv('LLM_PROVIDER', 'groq')}:{agent_model}:{question_set}"):
         mlflow.log_params({
             "llm_provider": os.getenv("LLM_PROVIDER", "groq"),
-            "llm_model": model_name(llm),
+            "agent_model": agent_model,
+            "judge_model": model_name(llm),
             "embedding_model": config.EMBEDDING_MODEL,
             "reranker_model": config.RERANKER_MODEL,
             "chunk_size": config.CHUNK_SIZE,
