@@ -61,7 +61,26 @@ def classification_metrics(labels: list[int], probabilities: list[float], thresh
     }
 
 
-def train_baseline(train: list[dict], test: list[dict]) -> dict:
+def best_threshold(labels: list[int], probabilities: list[float]) -> float:
+    """Pick the cutoff that maximizes F1 on the validation set. Each model gets its own
+    cutoff, so the comparison is fair (a fixed 0.5 can be wrong for one of them)."""
+    from sklearn.metrics import f1_score
+
+    candidates = [round(0.05 * i, 2) for i in range(1, 20)]
+    return max(candidates, key=lambda t: f1_score(labels, [int(p >= t) for p in probabilities], zero_division=0))
+
+
+def evaluate_both_ways(val_labels, val_probs, test_labels, test_probs) -> dict:
+    """Test metrics at the default 0.5 cutoff and at the cutoff tuned on validation data."""
+    threshold = best_threshold(val_labels, val_probs)
+    return {
+        "threshold": threshold,
+        "at_0.5": classification_metrics(test_labels, test_probs, 0.5),
+        "tuned": classification_metrics(test_labels, test_probs, threshold),
+    }
+
+
+def train_baseline(train: list[dict], val: list[dict], test: list[dict]) -> dict:
     """A strong, fast classic baseline. A Transformer is only worth it if it beats this."""
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.linear_model import LogisticRegression
@@ -69,8 +88,12 @@ def train_baseline(train: list[dict], test: list[dict]) -> dict:
     vectorizer = TfidfVectorizer(max_features=50000, ngram_range=(1, 2), sublinear_tf=True)
     model = LogisticRegression(max_iter=1000)
     model.fit(vectorizer.fit_transform([r["text"] for r in train]), [r["label"] for r in train])
-    probabilities = model.predict_proba(vectorizer.transform([r["text"] for r in test]))[:, 1]
-    return classification_metrics([r["label"] for r in test], list(probabilities))
+
+    def probabilities(rows):
+        return list(model.predict_proba(vectorizer.transform([r["text"] for r in rows]))[:, 1])
+
+    return evaluate_both_ways([r["label"] for r in val], probabilities(val),
+                              [r["label"] for r in test], probabilities(test))
 
 
 def train_transformer(train: list[dict], val: list[dict], test: list[dict], epochs: float, seed: int) -> dict:
@@ -106,16 +129,16 @@ def train_transformer(train: list[dict], val: list[dict], test: list[dict], epoc
                       data_collator=DataCollatorWithPadding(tokenizer))
     trainer.train()
 
-    def evaluate(split_name: str) -> dict:
+    def probabilities(split_name: str) -> list[float]:
         logits = trainer.predict(datasets[split_name]).predictions
-        probabilities = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
-        return classification_metrics(list(datasets[split_name]["label"]), list(probabilities[:, 1]))
+        return list((np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True))[:, 1])
 
-    val_metrics, test_metrics = evaluate("val"), evaluate("test")
+    results = evaluate_both_ways(list(datasets["val"]["label"]), probabilities("val"),
+                                 list(datasets["test"]["label"]), probabilities("test"))
     os.makedirs(MODEL_DIR, exist_ok=True)
     trainer.save_model(MODEL_DIR)
     tokenizer.save_pretrained(MODEL_DIR)
-    return {"val": val_metrics, "test": test_metrics}
+    return results
 
 
 def main() -> None:
@@ -144,26 +167,29 @@ def main() -> None:
                            "seed": args.seed})
 
         print("\nTraining baseline (TF-IDF + logistic regression)...")
-        baseline = train_baseline(train, test)
-        mlflow.log_metrics({f"baseline_{k}": v for k, v in baseline.items()})
-        print("  baseline test:", baseline)
+        baseline = train_baseline(train, val, test)
+        print("  baseline test (tuned cutoff):", baseline["tuned"])
 
         print("\nFine-tuning DistilBERT (this is the slow part)...")
-        results = train_transformer(train, val, test, args.epochs, args.seed)
-        mlflow.log_metrics({f"distilbert_val_{k}": v for k, v in results["val"].items()})
-        mlflow.log_metrics({f"distilbert_test_{k}": v for k, v in results["test"].items()})
-        print("  distilbert test:", results["test"])
+        distilbert = train_transformer(train, val, test, args.epochs, args.seed)
+        print("  distilbert test (tuned cutoff):", distilbert["tuned"])
 
-        summary = {"baseline_test": baseline, "distilbert": results, "train_size": len(train)}
+        for name, result in {"baseline": baseline, "distilbert": distilbert}.items():
+            mlflow.log_metric(f"{name}_threshold", result["threshold"])
+            mlflow.log_metrics({f"{name}_{k}": v for k, v in result["tuned"].items()})
+            mlflow.log_metrics({f"{name}_at05_{k}": v for k, v in result["at_0.5"].items()})
+
+        summary = {"baseline": baseline, "distilbert": distilbert, "train_size": len(train)}
         with open(os.path.join(MODEL_DIR, "metrics.json"), "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
         mlflow.log_dict(summary, "phishing_classifier_metrics.json")
 
     print(f"\nSaved model to {MODEL_DIR}")
+    print(f"\nTest results with each model's cutoff tuned on validation data "
+          f"(TF-IDF {baseline['threshold']}, DistilBERT {distilbert['threshold']}):")
     print(f"{'Metric':<10}{'TF-IDF':>10}{'DistilBERT':>12}")
-    for key in baseline:
-        print(f"{key:<10}{baseline[key]:>10}{results['test'][key]:>12}")
-
+    for key in baseline["tuned"]:
+        print(f"{key:<10}{baseline['tuned'][key]:>10}{distilbert['tuned'][key]:>12}")
 
 if __name__ == "__main__":
     main()
