@@ -6,7 +6,7 @@ over real threat-intelligence data, looks up CVEs, checks suspicious URLs, and c
 phishing emails with a fine-tuned Transformer. Every factual claim cites its source.
 
 **Stack:** Python, LangGraph, ChromaDB, BM25, sentence-transformers, Hugging Face Transformers
-(DistilBERT), FastAPI, MLflow, Docker, Groq / Gemini / Ollama LLMs
+(DistilBERT), FastAPI, MLflow, Docker, Groq / Gemini / Ollama / Anthropic / OpenAI LLMs
 
 ## Results
 
@@ -48,7 +48,7 @@ flowchart LR
     T2 --> DB
     T3 --> R[Rule-based URL analyzer]
     T4 --> M[Fine-tuned DistilBERT]
-    A --> L[LLM: Groq / Gemini / Ollama]
+    A --> L[LLM: Groq / Gemini / Ollama / Anthropic / OpenAI]
     E[MLflow evaluation] -.measures.-> A
 ```
 
@@ -87,7 +87,7 @@ python -m app.retrieve "How do attackers use phishing for initial access?"
 ## Ask the agent
 
 Set `LLM_PROVIDER` and its API key in `.env` (Groq and Gemini have free tiers;
-Ollama runs locally with no key), then:
+Ollama runs locally with no key; Anthropic and OpenAI need prepaid credits), then:
 
 ```bash
 python -m app.agent "Is http://paypa1.com/login/verify safe?"
@@ -176,7 +176,7 @@ Runs the labeled questions in `eval/agent_questions.json` through the agent and 
 | `tool_accuracy` | Share of questions where the agent chose the expected tool |
 | `fact_recall` | Share of required facts present in the answer |
 | `citation_rate` | Share of answers that cite a CVE or ATT&CK ID |
-| `faithfulness` | LLM-as-judge score: are the answer's specific claims supported by tool outputs? |
+| `faithfulness` | LLM-as-judge score: are the answer's specific claims supported by tool outputs? The judge replies with **structured output** (a Pydantic `JudgeResult` schema), with a text-parsing fallback for models that don't support it. |
 | `latency_ms_median` | Median time per question |
 | `retrieval_*_hit_at_5`, `retrieval_*_mrr` | Retrieval quality for each search mode |
 

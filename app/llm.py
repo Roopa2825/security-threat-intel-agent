@@ -3,8 +3,11 @@
   LLM_PROVIDER=groq     (needs GROQ_API_KEY, free tier)
   LLM_PROVIDER=gemini   (needs GOOGLE_API_KEY, free tier)
   LLM_PROVIDER=ollama   (runs locally, no key; install Ollama first)
+  LLM_PROVIDER=anthropic (needs ANTHROPIC_API_KEY, paid; Claude models)
+  LLM_PROVIDER=openai   (needs OPENAI_API_KEY, paid; GPT models)
 
-Set LLM_MODEL to choose a specific model. Providers retire models often, so for
+Set LLM_MODEL to choose a specific model (recommended for Anthropic and OpenAI,
+whose model names change over time). Providers retire models often, so for
 Groq, if LLM_MODEL is not set, the code asks Groq which models are available
 and picks the first suitable one.
 
@@ -15,6 +18,9 @@ import os
 DEFAULT_MODELS = {
     "gemini": "gemini-2.5-flash",
     "ollama": "llama3.1:8b",
+    # Small, low-cost models. If one is retired, set LLM_MODEL in .env.
+    "anthropic": "claude-haiku-5-5",
+    "openai": "gpt-5-mini",
 }
 # Preferred Groq chat models, best first. Only models Groq currently offers are used.
 GROQ_PREFERRED = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "openai/gpt-oss-20b"]
@@ -57,7 +63,19 @@ def get_llm(model: str | None = None):
         from langchain_ollama import ChatOllama
 
         return ChatOllama(model=model or DEFAULT_MODELS["ollama"], temperature=0)
-    raise ValueError(f"Unknown LLM_PROVIDER '{provider}'. Use groq, gemini or ollama.")
+    if provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
+        model = model or DEFAULT_MODELS["anthropic"]
+        print(f"[using Anthropic model: {model}]")
+        return ChatAnthropic(model=model, temperature=0)
+    if provider == "openai":
+        from langchain_openai import ChatOpenAI
+
+        model = model or DEFAULT_MODELS["openai"]
+        print(f"[using OpenAI model: {model}]")
+        return ChatOpenAI(model=model, temperature=0)
+    raise ValueError(f"Unknown LLM_PROVIDER '{provider}'. Use groq, gemini, ollama, anthropic or openai.")
 
 
 if __name__ == "__main__":

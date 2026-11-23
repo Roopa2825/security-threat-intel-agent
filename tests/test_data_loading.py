@@ -188,3 +188,50 @@ def test_average_ignores_broken_passes():
     assert summary["complete_passes"] == 1 and summary["faithfulness"] == 0.9
     assert is_daily_limit("Rate limit reached ... on tokens per day (TPD): Limit 200000")
     assert not is_daily_limit("Rate limit reached ... on tokens per minute (TPM)")
+
+
+class _FakeStructured:
+    def __init__(self, result=None, error=None):
+        self.result, self.error = result, error
+
+    def invoke(self, prompt):
+        if self.error:
+            raise self.error
+        return self.result
+
+
+class _FakeLLM:
+    """Stands in for a chat model, so the judge can be tested without an API key."""
+
+    def __init__(self, structured=None, text=""):
+        self.structured, self.text = structured, text
+
+    def with_structured_output(self, schema):
+        if self.structured is None:
+            raise NotImplementedError
+        return self.structured
+
+    def invoke(self, prompt):
+        class Reply:
+            content = self.text
+        return Reply()
+
+
+def test_judge_uses_structured_output():
+    from app.agent_metrics import JudgeResult
+    from app.evaluate_agent import judge
+
+    llm = _FakeLLM(structured=_FakeStructured(JudgeResult(faithfulness=1.4, unsupported_claims=["x"])))
+    result = judge(llm, "Answer [CVE-2021-44228]", ["context"])
+    assert result == {"faithfulness": 1.0, "unsupported_claims": ["x"]}  # score clamped to 0..1
+
+
+def test_judge_falls_back_to_text_when_structured_output_is_unsupported():
+    from app.evaluate_agent import judge
+
+    llm = _FakeLLM(structured=None, text='{"faithfulness": 0.7, "unsupported_claims": []}')
+    assert judge(llm, "Answer", ["context"])["faithfulness"] == 0.7
+
+    failing = _FakeLLM(structured=_FakeStructured(error=ValueError("bad schema")),
+                       text='{"faithfulness": 0.5, "unsupported_claims": []}')
+    assert judge(failing, "Answer", ["context"])["faithfulness"] == 0.5

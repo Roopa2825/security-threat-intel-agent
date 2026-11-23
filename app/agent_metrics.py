@@ -2,6 +2,8 @@
 import json
 import re
 
+from pydantic import BaseModel, Field
+
 # A source ID in square brackets, optionally after "source:", e.g. [T1566], [source: T1110.001]
 # or [cve-2023-4966-citrix-bleed] (a local advisory ID that starts with a CVE ID).
 CITATION_PATTERN = re.compile(r"\[\s*(?:source:\s*)?(CVE-\d{4}-\d{4,}|T\d{4}(?:\.\d{3})?)", re.IGNORECASE)
@@ -49,6 +51,19 @@ def sourced_part(answer: str) -> str:
     """The part of the answer before the 'General guidance' section, which must be grounded."""
     index = normalize(answer).find(GENERAL_GUIDANCE_HEADING)
     return answer if index == -1 else answer[:index]
+
+
+class JudgeResult(BaseModel):
+    """The format the judge must reply in (structured output), instead of free text."""
+
+    faithfulness: float = Field(description="0.0 (mostly unsupported) to 1.0 (every specific claim supported)")
+    unsupported_claims: list[str] = Field(default_factory=list,
+                                          description="Specific claims not supported by the context")
+
+
+def judge_result_to_dict(result: JudgeResult) -> dict:
+    return {"faithfulness": max(0.0, min(1.0, float(result.faithfulness))),
+            "unsupported_claims": list(result.unsupported_claims)}
 
 
 def parse_judge_output(text: str) -> dict:

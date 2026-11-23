@@ -20,7 +20,8 @@ import statistics
 import time
 
 from app import config  # noqa: F401  (loads .env and quiet settings first)
-from app.agent_metrics import fact_recall, has_citation, parse_judge_output, sourced_part, tool_correct
+from app.agent_metrics import (JudgeResult, fact_recall, has_citation, judge_result_to_dict, parse_judge_output,
+                               sourced_part, tool_correct)
 
 QUESTIONS_FILE = "eval/agent_questions.json"
 TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
@@ -51,11 +52,33 @@ def model_name(llm) -> str:
     return getattr(llm, "model_name", None) or getattr(llm, "model", None) or "unknown"
 
 
+def is_rate_limit(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "429" in text or "rate limit" in text or "rate_limit" in text
+
+
+def structured_judge(llm):
+    """The judge model with structured output (replies as a validated JudgeResult), or None
+    if this model does not support it."""
+    try:
+        return llm.with_structured_output(JudgeResult)
+    except (NotImplementedError, AttributeError, ValueError):
+        return None
+
+
 def judge(llm, answer: str, tool_outputs: list[str]) -> dict:
     context = "\n\n---\n\n".join(tool_outputs)[:12000] or "(no tool output)"
     prompt = JUDGE_PROMPT.format(context=context, answer=sourced_part(answer))
+    structured = structured_judge(llm)
     for attempt in range(1, 4):  # retry on rate limits
         try:
+            if structured is not None:
+                try:
+                    return judge_result_to_dict(structured.invoke(prompt))
+                except Exception as exc:
+                    if is_rate_limit(exc):
+                        raise
+                    structured = None  # model could not follow the schema: fall back to text
             return parse_judge_output(str(llm.invoke(prompt).content))
         except Exception as exc:
             if attempt == 3:
