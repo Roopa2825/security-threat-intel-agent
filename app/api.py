@@ -3,7 +3,9 @@
 Run:   uvicorn app.api:app --reload
 Docs:  open http://127.0.0.1:8000/docs  (interactive Swagger UI)
 """
+import os
 import time
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Literal
 
@@ -13,7 +15,26 @@ from pydantic import BaseModel, Field
 from app import config  # noqa: F401  (loads .env and quiet settings first)
 from app.url_analyzer import analyze_url, is_valid_cve_id
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Warm-up: load the models, database and agent when the server starts, so the first
+    request is not slow (cold start). Set WARMUP=0 to skip, e.g. in tests."""
+    if os.getenv("WARMUP", "1") == "1":
+        try:
+            from app.keyword_search import get_keyword_index
+            from app.retrieve import get_reranker
+            from app.vectorstore import get_collection, get_model
+
+            get_model(), get_reranker(), get_collection(), get_keyword_index()
+            get_agent()
+            print("Warm-up complete: models, index and agent loaded.")
+        except Exception as exc:  # e.g. empty index or missing API key: start anyway
+            print(f"Warm-up skipped: {exc}")
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Security Threat Intelligence Agent",
     description="AI agent with RAG over CISA KEV and MITRE ATT&CK, CVE lookup and phishing URL checks.",
     version="0.1.0",

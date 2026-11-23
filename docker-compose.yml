@@ -1,0 +1,14 @@
+services:
+  api:
+    build: .
+    image: security-threat-intel-agent
+    ports:
+      - "8000:8000"
+    env_file: .env            # your API keys stay on your machine, never inside the image
+    environment:
+      CHROMA_DIR: /data/chroma_db
+    volumes:
+      - chroma_data:/data     # the vector database survives container restarts
+
+volumes:
+  chroma_data:

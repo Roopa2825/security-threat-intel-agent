@@ -5,7 +5,6 @@ retrieval-augmented generation (RAG) over real threat-intelligence data
 (CISA Known Exploited Vulnerabilities and MITRE ATT&CK) and will use tools
 to check suspicious URLs and look up CVEs.
 
-> Work in progress. Planned: Docker.
 
 ## Setup
 
@@ -79,6 +78,19 @@ Example:
 ```bash
 curl -X POST http://127.0.0.1:8000/ask -H "Content-Type: application/json" -d "{\"question\": \"Is http://paypa1.com/login/verify safe?\"}"
 ```
+
+## Run with Docker
+
+```bash
+docker compose build                                   # first build takes 10-20 minutes
+docker compose run --rm api python -m app.build_index  # build the knowledge base once (stored in a volume)
+docker compose up                                      # start the API on http://127.0.0.1:8000/docs
+```
+
+- API keys are read from your local `.env` at runtime and are never copied into the image.
+- The vector database lives in a Docker volume, so it survives restarts.
+- Models are downloaded at build time and loaded at startup (warm-up), so the first request is fast.
+- The container runs as a non-root user and has a health check on `/health`.
 
 ## Measure search quality
 
