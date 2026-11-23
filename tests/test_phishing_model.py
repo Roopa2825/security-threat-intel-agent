@@ -37,3 +37,9 @@ def test_best_threshold_fixes_a_too_cautious_model():
     assert best_threshold(labels, probabilities) <= 0.4
     result = evaluate_both_ways(labels, probabilities, labels, probabilities)
     assert result["tuned"]["recall"] == 1.0 and result["at_0.5"]["recall"] < 1.0
+
+
+def test_verdict_uses_tuned_threshold():
+    assert verdict_for(0.2, threshold=0.1) == "possibly phishing"
+    assert verdict_for(0.05, threshold=0.1) == "likely legitimate"
+    assert verdict_for(0.9, threshold=0.1) == "likely phishing"
