@@ -6,6 +6,8 @@ from langchain_core.tools import tool
 
 from app.url_analyzer import analyze_url, is_valid_cve_id
 
+RESULT_CHARS = 1200  # text passed to the LLM per search result (more context vs. more tokens)
+
 
 @tool
 def search_threat_intel(query: str) -> str:
@@ -19,7 +21,7 @@ def search_threat_intel(query: str) -> str:
     if not hits:
         return "No relevant documents found."
     return "\n\n".join(
-        f"[{h['doc_id']}] {h['title']} (source: {h['source']})\n{h['text'][:700]}" for h in hits
+        f"[{h['doc_id']}] {h['title']} (source: {h['source']})\n{h['text'][:RESULT_CHARS]}" for h in hits
     )
 
 

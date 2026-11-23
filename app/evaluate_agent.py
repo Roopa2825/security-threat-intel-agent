@@ -23,7 +23,7 @@ from app.agent_metrics import fact_recall, has_citation, parse_judge_output, sou
 QUESTIONS_FILE = "eval/agent_questions.json"
 TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
 EXPERIMENT = "security-threat-intel-agent"
-DELAY_SECONDS = float(os.getenv("EVAL_DELAY_SECONDS", "3"))  # stay under free-tier rate limits
+DELAY_SECONDS = float(os.getenv("EVAL_DELAY_SECONDS", "5"))  # stay under free-tier rate limits
 
 JUDGE_PROMPT = """You are grading an AI security assistant for faithfulness.
 
