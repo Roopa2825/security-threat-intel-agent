@@ -56,6 +56,20 @@ The agent is a LangGraph loop. The LLM chooses between three tools:
 | `search_threat_intel` | Hybrid RAG search over CISA KEV, MITRE ATT&CK and local advisories |
 | `lookup_cve` | Exact lookup of a CVE ID in the CISA KEV catalog |
 | `check_url` | Rule-based phishing checks (typosquatting, lookalike characters, brand-in-subdomain, IP hosts, `@` tricks). The URL is never visited. |
+| `classify_phishing_text` | Fine-tuned DistilBERT classifier for email or message text (see below) |
+
+## Phishing email classifier (Hugging Face)
+
+```bash
+python -m app.train_phishing_model      # about 20-40 minutes on a laptop CPU
+```
+
+Fine-tunes `distilbert-base-uncased` on the public
+[Phishing Email Dataset](https://huggingface.co/datasets/zefang-liu/phishing-email-dataset)
+(LGPL-3.0) and compares it with a TF-IDF + logistic regression baseline on the same
+held-out test emails. Duplicate emails are removed before splitting to avoid leakage.
+Metrics (accuracy, precision, recall, F1, ROC-AUC) are logged to MLflow, and the model is
+saved to `models/phishing-distilbert` (not committed to Git).
 
 ## REST API (FastAPI)
 
@@ -72,6 +86,7 @@ Open http://127.0.0.1:8000/docs for interactive API docs.
 | POST | `/search` | Search the knowledge base directly (no LLM) |
 | POST | `/check-url` | Phishing checks for a URL (no LLM) |
 | GET | `/cve/{cve_id}` | Look up a CVE in CISA KEV and local advisories |
+| POST | `/classify-text` | Phishing probability for email text (fine-tuned DistilBERT) |
 
 Example:
 

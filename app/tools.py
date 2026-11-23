@@ -62,4 +62,17 @@ def lookup_cve(cve_id: str) -> str:
     )
 
 
-ALL_TOOLS = [search_threat_intel, check_url, lookup_cve]
+@tool
+def classify_phishing_text(text: str) -> str:
+    """Classify the text of an email or message (not a URL) as phishing or legitimate,
+    using a DistilBERT model fine-tuned on a public phishing email dataset. Use it when
+    the user pastes email or SMS content. Returns a phishing probability."""
+    from app.phishing_model import classify_text
+
+    try:
+        return json.dumps(classify_text(text), indent=2)
+    except FileNotFoundError as exc:
+        return f"The phishing text classifier is not available: {exc}"
+
+
+ALL_TOOLS = [search_threat_intel, check_url, lookup_cve, classify_phishing_text]

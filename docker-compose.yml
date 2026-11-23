@@ -9,6 +9,7 @@ services:
       CHROMA_DIR: /data/chroma_db
     volumes:
       - chroma_data:/data     # the vector database survives container restarts
+      - ./models:/app/models:ro   # the fine-tuned phishing classifier, trained on your machine
 
 volumes:
   chroma_data:

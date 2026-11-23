@@ -130,6 +130,22 @@ def check_url(request: UrlRequest) -> UrlResponse:
     return UrlResponse(**analyze_url(request.url))
 
 
+class TextRequest(BaseModel):
+    text: str = Field(..., min_length=20, max_length=20000,
+                      examples=["Your account is locked. Verify your password within 24 hours at the link below."])
+
+
+@app.post("/classify-text")
+def classify_email_text(request: TextRequest) -> dict:
+    """Phishing probability for email or message text, from the fine-tuned DistilBERT model (no LLM)."""
+    from app.phishing_model import classify_text
+
+    try:
+        return classify_text(request.text)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @app.get("/cve/{cve_id}")
 def get_cve(cve_id: str) -> dict:
     """Look up a CVE in the CISA KEV catalog and local advisories (no LLM)."""
