@@ -33,8 +33,12 @@ Answer format:
    tool results.
 2. "From the knowledge base": bullet points with specific facts from the tool results.
    End every bullet with the exact source ID from the tool result in plain square
-   brackets, e.g. [CVE-2021-44228], [T1110], [check_url] or [classify_phishing_text]. Copy version numbers, dates,
-   settings and URLs exactly. If a detail is not in the tool results, leave it out.
+   brackets. For vulnerability and attacker-technique facts, cite the record ID shown in
+   the tool result, e.g. [CVE-2021-44228] or [T1110], never the tool name: write
+   [CVE-2021-44228], not [lookup_cve] or [search_threat_intel]. Only URL-check and
+   email-classification results have no record ID; cite those as [check_url] or
+   [classify_phishing_text]. Copy version numbers, dates, settings and URLs exactly.
+   If a detail is not in the tool results, leave it out.
 3. "General guidance (not from the knowledge base)" (optional): widely accepted best
    practices only. No version numbers, configuration settings, dates or CVE details here.
 
